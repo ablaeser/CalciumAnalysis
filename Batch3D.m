@@ -40,7 +40,7 @@ xSuper = [37, 41, 31];
 xNGC = [62:65];
 xCtrl = [66, 87, 91, 97, 98, 99]; % 80,   89,
 % Choose which subset to  use
-xPresent = xCSD; %x3D; % % x2D; 30; % %xCtrl; %x3Dcsd; %;5; %xCtrl; %x3Dcsd; %[x2D, xCtrl]; % xCtrl; %97; % x3D; %xCtrl; % 
+xPresent = xCSD; %31; % 5; %x3D; % % x2D; 30; % %xCtrl; %x3Dcsd; %;5; %xCtrl; %x3Dcsd; %[x2D, xCtrl]; % xCtrl; %97; % x3D; %xCtrl; % 
 Npresent = numel(xPresent);
 overwriteROI = false;
 for x = xPresent
@@ -83,11 +83,9 @@ for x = xPresent
     % Get deformation data
     [~, deform{x}, regParams, badInd] = GetDeformCat3D( catInfo{x}, deformLim, 'show',false, 'overwrite',false, 'window',find(Tscan{x}{1}<=32,1,'last') );  %  deformCat, affParams
     
-    % Get locomotion state
-    try
+    % Get locomotion state if not already calculated
+    if any(cellfun(@isempty, {loco{x}.stateDown})) %isempty(loco{x}.stateDown)
         loco{x} = GetLocoState(expt{x}, loco{x}, 'dir',strcat(dataDir, expt{x}.mouse,'\'), 'name',expt{x}.mouse, 'var','velocity', 'show',false); %
-    catch
-        fprintf('\n%s: GetLocoState failed!\n', expt{x}.name)
     end
     
     % Segment movies
@@ -119,13 +117,15 @@ for x = xPresent
     end
 
     % Load ROI
+    % {
     try
         ROI{x} = MakeROI3D(expt{x}, 'overwrite',overwriteROI, 'corrPrct',90, 'minFoot',50);  % , 'corrPrct',90, [ROI{x}, preROI{x}] overwriteROI
         ROI{x} = rmfield(ROI{x}, 'correlation'); % correlation field is memory-intensive and not useful
-        Nauto(x) = numel(ROI{x});
+        expt{x}.Nroi = numel(ROI{x}); % Nauto(x)
     catch
-        Nauto(x) = 0;
+        expt{x}.Nroi = 0;
     end
+    %}
     %{
     try
         [ROI{x}, ~ ] = LoadManualROI(expt{x}, [3,3,1], [8,8,1; 21,21,2], segParams{x}.zProj ); %^LoadManualROI( expt{x}, 3 );
@@ -173,6 +173,21 @@ for x = xPresent
     %}
 end
 % May need to run BoutResponse, SpontVsLocoEvent, FiberAnalyis, CSDspread
+
+%% Save locomotion data to avoid needing to recalculate HMMs 
+for x = xPresent
+    savePath = sprintf('%s%s_locomotion.mat', expt{x}.dir, expt{x}.name);
+    if true %~exist(savePath, 'file')
+        locoData = loco{x};
+        fprintf('\nSaving %s', savePath)
+        save(savePath, 'locoData');
+    end
+end
+
+
+
+
+
 
 %%
 for x = xPresent
