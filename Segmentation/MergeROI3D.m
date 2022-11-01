@@ -1,4 +1,4 @@
-function [axon, expt, stillCosSim, stillCorr, rSilent] = MergeROI3D(expt, T, loco, ROI, fluor, stillEvent, varargin) % sbxPath,  , axonLabelFoot, axonLabelVol , stillEpoch
+function [axon, expt, stillCosSim, stillCorr, rSilent] = MergeROI3D(expt, T, loco, ROI, fluor, stillEventRaster, varargin) % sbxPath,  , axonLabelFoot, axonLabelVol , stillEpoch
 % Use the hierarchical clustering procedure outlined in Liang,... Andermann 2018 to find ROI sets that likely belong to the same axon
 IP = inputParser;
 addRequired( IP, 'expt', @isstruct )
@@ -6,14 +6,14 @@ addRequired( IP, 'T', @iscell )
 addRequired( IP, 'loco', @isstruct )
 addRequired( IP, 'ROI', @isstruct )
 addRequired( IP, 'fluor', @isstruct )
-addRequired( IP, 'stillEvent', @iscell )
+addRequired( IP, 'stillEventRaster', @islogical )
 %addRequired( IP, 'stillEpoch', @isstruct )
 addParameter( IP, 'method', '', @ischar ) % 'cluster'
 addParameter( IP, 'zThresh', 2.5, @isnumeric)
 addParameter( IP, 'mergeThresh', 0.15, @isnumeric)
 addParameter( IP, 'show', false, @islogical)
 %addParameter( IP, 'write', true, @islogical)
-parse( IP, expt, T, loco, ROI, fluor, stillEvent, varargin{:} ); % , stillEpoch
+parse( IP, expt, T, loco, ROI, fluor, stillEventRaster, varargin{:} ); % , stillEpochstillEvent, 
 mergeMethod = IP.Results.method;
 show = IP.Results.show;
 %writeTif = IP.Results.write;
@@ -36,7 +36,7 @@ zStillPre = normalize(fluorStillPre, 1); %zscore(fluorStillPre, 1);
 
 % Detect 2.5 sigma events for each ROI, and calculate correlation with all other ROI during those events
 threshStillPre = zStillPre > zThresh;
-eventRaster = imdilate(threshStillPre, strel('rectangle',[3,1]) );
+stillEventRaster = imdilate(threshStillPre, strel('rectangle',[3,1]) );
 %}
 
 % Concatenate fluor data
@@ -46,26 +46,7 @@ Tcat = vertcat(T{:});
 
 % Calculate asymmetric, thresholded correlations during ROI-specific still epoch events
 %Nstill = numel(stillEpoch);
-%{
-eventRaster = false(expt.totScan, expt.Nroi);
-for s = 1:Nstill
-    for roi = 1:expt.Nroi %find(stillSumm.fluor.Nevent(s,:) > 0)
-        for e = 1:stillEvent(s,roi).Nevent
-            tempEventScans = stillEpoch(s).scan( stillEvent(s,roi).scan{e} ) + expt.scanLims(stillEpoch(s).run); %
-            eventRaster(tempEventScans,roi) = true;
-        end
-    end
-end
-%}
-eventRaster = false(expt.totScan, expt.Nroi);
-Nevent = cellfun(@numel, stillEvent);
-for roi = find(Nevent>0) % 1:expt.Nroi
-    for e = 1:Nevent(roi)
-        [~,~,tempScan] = intersect( stillEvent{roi}(e).T, Tcat );
-        eventRaster(tempScan,roi) = true;
-    end
-end
-%imagesc(eventRaster')
+
 %{
 epochRasters = cell(1,Nstill);
 for s = 1:Nstill
@@ -82,7 +63,7 @@ rSilent = find(sum(catRaster,1) == 0);
 
 stillCorr = zeros(expt.Nroi); rSilent = [];
 for roi = 1:expt.Nroi
-    tempEventScans = find(eventRaster(:,roi)); %find(catRaster) %find( eventRaster(:,roi) );
+    tempEventScans = find(stillEventRaster(:,roi)); %find(catRaster) %find( stillEventRaster(:,roi) );
     if ~isempty(tempEventScans)
         stillCorr(:,roi) = corr( fluorCat(tempEventScans,roi), fluorCat(tempEventScans,:), 'rows','complete' );
         stillCorr(roi,roi) = NaN;
@@ -148,7 +129,7 @@ for a = 1:expt.Naxon
     axon(a).crop = [min(tempCrop(:,1)), max(tempCrop(:,2)), min(tempCrop(:,3)), max(tempCrop(:,4))];
     axon(a).width = axon(a).crop(2) - axon(a).crop(1); 
     axon(a).height = axon(a).crop(4) - axon(a).crop(3);
-    axon(a).zUse = unique( horzcat(ROI(axon(a).ROI).zUse) );
+    axon(a).zUse = unique( vertcat(ROI(axon(a).ROI).zUse) ); % horzcat(ROI(axon(a).ROI).zUse)
     axon(a).similarity = stillCosSim(axon(a).ROI, axon(a).ROI); %nan(axon(a).Nroi); %
     axon(a).correlation = stillCorr(axon(a).ROI, axon(a).ROI); %nan(axon(a).Nroi); %
     tempCorr = axon(a).correlation(:); tempCorr(tempCorr == 1) = [];
@@ -194,7 +175,7 @@ if show
     set(gca,'Xtick',[]);
     ylabel('ROI'); title('Fluor (z score)'); 
     sp(2) = subtightplot(2,3,4,opt{:});
-    imagesc(eventRaster'); colorbar;
+    imagesc(stillEventRaster'); colorbar;
     xlabel('Scan'); ylabel('ROI'); title('Events');  
     linkaxes(sp,'xy');
 

@@ -15,7 +15,7 @@ for f = 1:Nfiber
     fiber(f).crop = [min(tempCrop(:,1)), max(tempCrop(:,2)), min(tempCrop(:,3)), max(tempCrop(:,4))];     
     fiber(f).width = fiber(f).crop(2) - fiber(f).crop(1); 
     fiber(f).height = fiber(f).crop(4) - fiber(f).crop(3);
-    fiber(f).zUse = unique( horzcat(ROI(fiber(f).ROI).zUse) );
+    fiber(f).zUse = unique( vertcat(ROI(fiber(f).ROI).zUse) );
     fiber(f).cent = vertcat(ROI(fiber(f).ROI).cent);
     fiber(f).apSep = expt.umPerPixel*squareform(pdist(fiber(f).cent(:,1)));
     fiber(f).mlSep = expt.umPerPixel*squareform(pdist(fiber(f).cent(:,2)));
@@ -39,8 +39,15 @@ for f = 1:Nfiber
     if fiber(f).Nroi > 1
         tempHull = bwconvhull(fiber(f).labelFoot );
         if show
-            subplot(2,1,1); imshow(fiber(f).labelFoot); title(sprintf('fiber %i', f)); % sprintf('[x,f] = [%i, %i]', x,f)
+            subplot(2,1,1); imshow(fiber(f).labelFoot); title(sprintf('fiber %i', f)); hold on; % sprintf('[x,f] = [%i, %i]', x,f)
+            for roi = fiber(f).ROI
+                text( ROI(roi).cent(1), ROI(roi).cent(2), num2str(roi), 'color','k' )
+            end
+
             subplot(2,1,2); imshow(tempHull ); title('Convex Hull'); %pause(0.1);
+            for roi = fiber(f).ROI
+                text( ROI(roi).cent(1), ROI(roi).cent(2), num2str(roi), 'color','k', 'VerticalAlignment','middle', 'HorizontalAlignment','center', 'fontsize', 8 )
+            end
             impixelinfo;
             pause
         end

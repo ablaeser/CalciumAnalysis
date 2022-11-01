@@ -14,17 +14,17 @@ windowSize = IP.Results.window;
 if mod(windowSize,2) ==0,  windowSize = windowSize+1; end
 basePrct = IP.Results.basePrct; 
 overwrite = IP.Results.overwrite;
-
+Naxon = numel(axon);
 tic
 if ~isfield(fluor(1).F, 'axon') || overwrite
     savePath = strcat( expt.dir, expt.name, '_axonFluor.mat' );
     if ~exist(savePath, 'file') || overwrite
-        Faxon = nan(expt.totScan, expt.Naxon); Fnp = nan(expt.totScan, expt.Naxon);
+        Faxon = nan(expt.totScan, Naxon); Fnp = nan(expt.totScan, Naxon);
         fprintf('\nExtracting traces');      
         w = waitbar(0,'Extracting axonal and neuropil traces...'); % w = 
         for s = 1:expt.totScan-1
-            tempVol = double( readSBX(expt.sbx, sbxInfo, expt.Nplane*(s-1)+1, expt.Nplane, 1, []) ); 
-            for a = 1:expt.Naxon
+            tempVol = double(readSBX(expt.sbx.interp, sbxInfo, s, 1, -1, [])); % %double( readSBX(expt.sbx, sbxInfo, expt.Nplane*(s-1)+1, expt.Nplane, 1, []) ); 
+            for a = 1:Naxon
                 Faxon(s,a) = mean( tempVol(axon(a).ind) );
                 Fnp(s,a) = mean( tempVol(axon(a).neuropil) );
             end
@@ -36,7 +36,7 @@ if ~isfield(fluor(1).F, 'axon') || overwrite
 
         % Censor scans where each ROI's planes had a bad deformation value
         transAPcat = cat(1, deform.transAP);
-        for a = 1:expt.Naxon
+        for a = 1:Naxon
             nan_scan = find( isnan(sum(transAPcat(:,axon(a).zUse),2) ) )';
             F(nan_scan,a) = NaN;
             fprintf('\nROI %i: censored %i scans with bad deformation values', a, numel(nan_scan) );
@@ -48,9 +48,10 @@ if ~isfield(fluor(1).F, 'axon') || overwrite
 
         % Deconvolve dF/F
         activity = nan(size(dFF,1),size(dFF,2));
+        %{
         if expt.Nplane == 1
             w = waitbar(0, 'Deconvolving censored dF/F');
-            for a = flip(1:expt.Naxon)
+            for a = flip(1:Naxon)
                 try
                     goodFrames = find(~isnan(dFF(:,a)))';
                     dFFcens = dFF(goodFrames,a);
@@ -60,16 +61,17 @@ if ~isfield(fluor(1).F, 'axon') || overwrite
                 catch
                     fprintf('\nROI %i:  Deconvolution failed', a);
                 end
-                waitbar(a/expt.Naxon, w);
+                waitbar(a/Naxon, w);
             end
             delete(w);
         end
+        %}
         toc
         fprintf('\nSaving %s', savePath);
         save(savePath, 'Faxon','Fnp','F','Fo','dFF','activity','nan_scan', '-v7.3');
     else
         fprintf('\nLoading %s', savePath);
-        load(savePath, 'Faxon','Fnp','F','Fo','dFF','activity' ) % ,'nan_scan'
+        load(savePath, 'Faxon','Fnp','F','Fo','dFF','activity' ); % ,'nan_scan'
     end
 
     % Break fluor signals up by run
@@ -91,7 +93,7 @@ if ~isfield(fluor(1).F, 'axon') || overwrite
         fluor(runs).dFF.corr = corr( fluor(runs).dFF.axon, 'Rows','complete' );
         fluor(runs).act.corr = corr( fluor(runs).act.axon, 'Rows','complete' );
         %{
-        for a = 1:expt.Naxon
+        for a = 1:Naxon
             subplot(4,2,[1,3,5,7]);
             %imshow( axon(a).labelFoot, [] );
             imshow( label2rgb(axon(a).labelFoot), [] );
