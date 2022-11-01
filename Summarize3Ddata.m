@@ -1,12 +1,10 @@
 %% View the big picture data
 viewLims = struct('trans',[-Inf,Inf], 'scale',[-Inf,Inf], 'stretch',[-Inf,Inf], 'shear',[-0.03,0.03], 'shift',[-3, 3], 'velocity',[-3, 15], 'fluor',[-5, 5]); 
-for x = x2D %xPresent % xPresent % x2D %xPresent %find(locoFrac(:,2) < 0.02)' %xWave %xPresent
-    sortROI = [boutResponse(x).pre.exc, boutResponse(x).pre.neut, boutResponse(x).pre.inh];
-    %sortROI = [preCSD_summary{X}.rDeform, preCSD_summary{X}.rMixed, preCSD_summary{X}.rLoco];
-    ViewResults3D( expt{x}, Tscan{x}, deform{x}, loco{x}, fluor{x}, allVars, ROI{x}, 'cat',true, 'limits',viewLims, 'sortROI',sortROI); % , 'sortROI',boutResponse(x).pre.inh , 'sortROI',SNRsort{x}  , 'save','D:\MATLAB\LevyLab\Figures\Fibers\'  , 'save',expt{x}.dir
-    %,... 'sortROI',
-    %
-    %pause;
+for x = [9,13] % xPrePost %xPresent % xPresent % x2D %xPresent %find(locoFrac(:,2) < 0.02)' %xWave %xPresent
+    %sortROI = [boutResponse(x).pre.exc, boutResponse(x).pre.neut, boutResponse(x).pre.inh];
+    %sortROI = [preCSD_summary{X}.rDeform, preCSD_summary{X}.rMixed, preCSD_summary{X}.rLoco]; 
+    ViewResults3D( expt{x}, Tscan{x}, deform{x}, loco{x}, fluor{x}, allVars, ROI{x}, fiber{x}, 'cat',true, 'limits',viewLims); % , 'sortROI',sortROI
+
 end
 
 %% Inspect well isolated locomotion bouts
@@ -291,30 +289,31 @@ end
 
 
 %% Generate movies of registered CSD bouts
-movParam.dir = 'D:\MATLAB\LevyLab\Figures\BoutMovies\CSD\'; mkdir(movParam.dir); % 'D:\MATLAB\LevyLab\Figures\CSD\Movies\';
+movParam.dir = 'D:\MATLAB\Figures\CSD figures\'; mkdir(movParam.dir); % 'D:\MATLAB\LevyLab\Figures\CSD\Movies\';
 movParam.fmtSpec = '%2.2f';
 movParam.Tperi = [10,10]; % time before/after bout to show
 movParam.zProj = [];
-movParam.binT = 1;
+movParam.binT = 8;
 movParam.displayPct = [5,99.9];
 movParam.sbx = [];
-movParam.regType = 'affine'; %'raw'; % _axons
+movParam.regType = 'raw'; %'affine'; % % _axons
 movParam.boutType = 'csd';
 movParam.edges = []; % [80,80,20,20]; %[80,90,60,110]; %
 movParam.aviRate = 10; % frames per second
 movParam.Toffset = 0;
-movParam.level = 'none'; %'ind';
+movParam.level = 'cat';  %'ind'; %'none'; %
 for x = xCSD %xPresent 
     movParam.edges = segParams{x}.edges;
     movParam.zProj = segParams{x}.zProj; %segPlanes;
     if expt{x}.Nplane == 1
-        movParam.sourceSbx = 'sbx_affine'; %'sbxz'; % 
+        movParam.sourceSbx = 'sbxz'; %  'sbx_affine'; %
     else
         movParam.sourceSbx = 'sbx_interp';
     end
-    movParam.scalebar = MakeScaleBar( round(expt{x}.umPerPixel*[50,50]), {[0,expt{x}.Ncol-segParams{x}.edges(1)-segParams{x}.edges(2)]+0.5, [0,expt{x}.Nrow-segParams{x}.edges(3)-segParams{x}.edges(4)]+0.5},...
-        [0.1,0.95], [0,0], 'label',false, 'color','w', 'show',false );
-    [boutStack{x}, Tbout{x}, boutSpeed{x}, storeFrames{x}] = WriteBoutMovies(expt{x}, catInfo(x), Tscan{x}, loco{x}, csdBout{x}, movParam); % , ROI{x} , 'overwrite',true (1)    , ROI{x}, axon{x}
+    movParam.scalebar = [];
+    %movParam.scalebar = MakeScaleBar( round(expt{x}.umPerPixel*[50,50]), {[0,expt{x}.Ncol-segParams{x}.edges(1)-segParams{x}.edges(2)]+0.5, [0,expt{x}.Nrow-segParams{x}.edges(3)-segParams{x}.edges(4)]+0.5},...
+     %   [0.1,0.95], [0,0], 'label',false, 'color','w', 'show',false );
+    [boutStack{x}, Tbout{x}, boutSpeed{x}, storeFrames{x}] = WriteBoutMovies(expt{x}, catInfo{x}, Tscan{x}, loco{x}, csdBout{x}, movParam); % , ROI{x} , 'overwrite',true (1)    , ROI{x}, axon{x}
 end
 
 
@@ -371,19 +370,19 @@ end
 %% Generate movies of locomotion bouts
 
 movParam.fmtSpec = '%2.2f';
-movParam.Tperi = [4,4]; % time before/after bout to show
+movParam.Tperi = [10,10]; % time before/after bout to show
 movParam.zProj = [];
 movParam.binT = 1; % 15;
-movParam.displayPct = [2,99.95];
+movParam.displayPct = [5,99.95];
 movParam.sourceSbx = 'sbx_affine'; % 'sbx_partial'; %'sbxz'; % 
-movParam.regType = 'raw'; % 'partial'; % %'affine'; % 
+movParam.regType = 'affine'; % 'raw'; % 'partial'; % %
 movParam.boutType = 'loco';
 movParam.aviRate = 15; % frames per second
 movParam.level = 'both'; % 'cat'; % 'ind'; % 
-for x = 22 %xPresent
+for x = 5 %xPresent
     movParam.dir = ['D:\MATLAB\LevyLab\Figures\BoutMovies\Locomotion\', expt{x}.name,'\']; % 'D:\MATLAB\LevyLab\Figures\CSD\Movies\';
     movParam.edges = segParams{x}.edges;
-    movParam.zProj = segParams{x}.zProj;
+    movParam.zProj = 26:29; %segParams{x}.zProj;
     
     %movParam.scalebar = MakeScaleBar( round(expt{x}.umPerPixel*[50,50]), {[0,expt{x}.Ncol-segParams{x}.edges(1)-segParams{x}.edges(2)]+0.5, [0,expt{x}.Nrow-segParams{x}.edges(3)-segParams{x}.edges(4)]+0.5},...
     %    [0.1,0.95], [0,0], 'label',false, 'color','w', 'show',false );

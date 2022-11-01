@@ -10,34 +10,32 @@ pmt = IP.Results.pmt;
 edges = IP.Results.edges;
 chunkSize = IP.Results.chunkSize;
 
-Nx = sbxInfo.sz(1); 
-Ny = sbxInfo.sz(2);
-
 % set up paths
-affPath = sprintf('%s%s.sbxreg', sbxInfo.dir, sbxInfo.exptName );  % sprintf('%s%s.sbx_affine', sbxInfo.dir, sbxInfo.exptName ); 
+regPath = sprintf('%s%s.sbxreg', sbxInfo.dir, sbxInfo.exptName );  % sprintf('%s%s.sbx_affine', sbxInfo.dir, sbxInfo.exptName ); 
 interpPath = sprintf('%s%s.sbx_interp', sbxInfo.dir, sbxInfo.exptName );
 
 %crop edges of video
-Xrange = edges(3)+1:Nx-edges(4); 
-Yrange = edges(1)+1:Ny-edges(2); 
+row_range = edges(3)+1:sbxInfo.sz(1)-edges(4); 
+col_range = edges(1)+1:sbxInfo.sz(2)-edges(2); 
 %make the vectors for interpolation (same for each plane)
-vx = 1:numel(Xrange);
-vy = 1:numel(Yrange);
+v_row = 1:numel(row_range);
+v_col = 1:numel(col_range);
 
-[chunkLims, Nchunk, chunkLength] = MakeChunkLims(1, sbxInfo.totScan-1, sbxInfo.totScan-1, 'size',chunkSize); % prevent going beyond totScan
+[chunkLims, Nchunk, chunkLength] = MakeChunkLims(1, sbxInfo.totScan-1, sbxInfo.totScan-1, 'size',chunkSize, 'allowPartial',true); % prevent going beyond totScan
 w = waitbar(0,'Starting interpolation...'); %start the waitbar clock
 tic
 rw = SbxWriter(interpPath, sbxInfo, '.sbx_interp', true); % rw = pipe.io.RegWriter(interpPath, sbxInfo, '.sbx_interp', true);
 for chunk = 1:Nchunk % 
     % Load and crop data chunk to be interpolated
-    chunk_data = double(readSBX(affPath, sbxInfo, chunkLims(chunk,1), chunkLength(chunk)+1, pmt, []));
-    chunk_crop = chunk_data(:,Xrange,Yrange,:,:);
-    vt = 1:chunkLength(chunk)+1;
+    chunk_data = double(readSBX(regPath, sbxInfo, chunkLims(chunk,1), chunkLength(chunk)+1, pmt, []));
+    if ndims(chunk_data) == 4, chunk_data = permute(chunk_data, [5,1,2,3,4]); end % should be [chan, x, y, z, y]
+    chunk_crop = chunk_data(:,row_range,col_range,:,:); %
+    v_time = 1:chunkLength(chunk)+1;
     % Interpolate data from each channel and plane
     if chunk ~= Nchunk
-        chunk_interp = zeros(sbxInfo.nchan, Nx, Ny, sbxInfo.Nplane, chunkLength(chunk));
+        chunk_interp = zeros(sbxInfo.nchan, sbxInfo.sz(1), sbxInfo.sz(2), sbxInfo.Nplane, chunkLength(chunk));
     else
-        chunk_interp = zeros(sbxInfo.nchan, Nx, Ny, sbxInfo.Nplane, chunkLength(chunk)+1);
+        chunk_interp = zeros(sbxInfo.nchan, sbxInfo.sz(1), sbxInfo.sz(2), sbxInfo.Nplane, chunkLength(chunk)+1);
     end
     for chan = 1:sbxInfo.nchan
         for z = 1:sbxInfo.Nplane % parfor is slower
@@ -54,7 +52,7 @@ for chunk = 1:Nchunk %
             %}
             M = squeeze(chunk_crop(chan, :,:,z,:));
             % create the gridded interpolant based on the registered movie and the interpolation vectors
-            F = griddedInterpolant({vx,vy,vt}, M);
+            F = griddedInterpolant({v_row,v_col,v_time}, M);
 
             % calculate the partial shift for each z-plane. Earlier planes are shifted forward more than later ones
             s = (sbxInfo.Nplane-z)/sbxInfo.Nplane;
@@ -62,16 +60,16 @@ for chunk = 1:Nchunk %
             qt = linspace(1+s, chunkLength(chunk)+1+s, chunkLength(chunk)+1); % %make vector of shifted timepoints to evaluate the interpolant at
 
             %evaluate the interpolant at the same XY grid points, but shifted timepoints (qt).
-            M_s = F({vx,vy,qt});
+            M_s = F({v_row,v_col,qt});
             if chunk ~= Nchunk
-                chunk_interp(chan,Xrange,Yrange,z,:) = M_s(:,:,1:chunkLength(chunk));
+                chunk_interp(chan,row_range,col_range,z,:) = M_s(:,:,1:chunkLength(chunk));
             else
-                chunk_interp(chan,Xrange,Yrange,z,:) = M_s(:,:,1:chunkLength(chunk)+1);
+                chunk_interp(chan,row_range,col_range,z,:) = M_s(:,:,1:chunkLength(chunk)+1);
             end
         end 
     end
     %write to the binary file
-    chunk_interp = reshape(chunk_interp, sbxInfo.nchan, Nx, Ny,[]);
+    chunk_interp = reshape(chunk_interp, sbxInfo.nchan, sbxInfo.sz(1), sbxInfo.sz(2),[]);
     rw.write(uint16(chunk_interp));
     
     %estimate how much time is left and update the waitbar.

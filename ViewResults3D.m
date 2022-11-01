@@ -127,6 +127,8 @@ if ~isempty(ROI)
         %}
         end
     end
+else
+    Nroi = 0;
 end
 
 SP(3) = subtightplot(2,2,3, leftOpt{:}); %subtightplot(9,2,11:2:18, opt{:});
@@ -182,8 +184,8 @@ if catRuns
             ylabel('Velocity (cm/s)'); xlabel('Time (min)'); 
             set(gca, 'Xtick',1:XtickInt:Nscan(1), 'XTickLabel',Ttick, 'TickDir','out', 'TickLength',TL);
             xtickangle(30);
-        elseif strcmpi(viewVars{v}, 'fluor')
-            MakeDeformPlot( tempFluorCat, viewVars{v}, TL, runTicks, unique([1:round(Nroi/5):Nroi, Nroi]), limStruct.fluor ) % planeTicks unique([1:10:Nroi,Nroi])
+        elseif strcmpi(viewVars{v}, 'fluor') %&& Nroi > 0
+            MakeDeformPlot( tempFluorCat, viewVars{v}, TL, runTicks, unique([1:round(size(tempFluorCat,2)/5):size(tempFluorCat,2), size(tempFluorCat,2)]), limStruct.fluor ) % planeTicks unique([1:10:Nroi,Nroi])
             ylabel('ROI'); title( expt.name, 'Interpreter','none' )
         else
             for f = 1:numel(limFields)

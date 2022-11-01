@@ -1,6 +1,7 @@
 clear; clc; close all;
 dataDir = 'D:\2photon\';  %'C:\2photon';
 dataSet = 'Afferents'; % 'Pollen'; %'Astrocyte'; %    'NGC'; % 'Neutrophil'; % 
+figDir = 'D:\MATLAB\Dura\Figures\CSD paper\';
 % Parse data table
 dataTablePath = 'R:\Levy Lab\2photon\ImagingDatasets.xlsx'; %'D:\MATLAB\ImagingDatasets.xlsx'; % 'D:\MATLAB\NGCdata.xlsx'; 
 dataTable = readcell(dataTablePath, 'sheet',dataSet);  % 'NGC', ''
@@ -11,26 +12,26 @@ Nexpt = size(dataTable, 1);
 dataTable(:,dataCol.date) = cellfun(@num2str, dataTable(:,dataCol.date), 'UniformOutput',false);
 
 % Initialize variables
-expt = cell(1,Nexpt); runInfo = cell(1,Nexpt); catInfo = cell(1,Nexpt); Tscan = cell(1,Nexpt); loco = cell(1,Nexpt);  fluor = cell(1,Nexpt); 
+expt = cell(1,Nexpt); runInfo = cell(1,Nexpt);  Tscan = cell(1,Nexpt); loco = cell(1,Nexpt);  fluor = cell(1,Nexpt);  catInfo = cell(1,Nexpt);
 deform = cell(1,Nexpt); scaleCat = cell(1,Nexpt); ROIdeform = cell(1,Nexpt);
 segParams = cell(1,Nexpt); ROI = cell(1,Nexpt); Nauto = nan(1,Nexpt); Nmanual = nan(1,Nexpt); axon = cell(1,Nexpt); stillCosSim = cell(1,Nexpt); stillCorr = cell(1,Nexpt); 
 fluorEvent = cell(1,Nexpt); NfluorEvent = cell(1,Nexpt); fluorEventRate = cell(1,Nexpt); eventRaster = cell(1,Nexpt);
 periBout = cell(1,Nexpt); periStat = cell(1,Nexpt); csdBout = cell(1,Nexpt); csdStat = cell(1,Nexpt); %periParam = cell(1,Nexpt); 
 stillEpoch = cell(1,Nexpt); stillSumm = cell(1,Nexpt);
-defVars = {'transAP', 'transML', 'transMag', 'scaleAP', 'scaleML', 'scaleMag', 'stretchAP', 'stretchML', 'shearAP', 'shearML', 'shearMag', 'shiftZ', 'DshiftZ'}; %
+defVars = {'transAP', 'transML', 'transMag', 'scaleAP', 'scaleML', 'scaleMag', 'stretchAP', 'stretchML', 'shearAP', 'shearML', 'shearMag', 'shiftZ'}; % , 'DshiftZ'
 NdefVars = numel( defVars ); %, 'dShiftZ'
 allVars = [{'fluor'}, defVars, {'velocity'}]; NallVars = numel(allVars);
 %deformLim = struct('trans',[-Inf, Inf], 'scale',[-Inf, Inf], 'shear',[-Inf, Inf], 'shift',[-Inf, Inf]); %struct('trans',[-30, 30], 'scale',[0.97, 1.03], 'shear',[-0.02, 0.02], 'shift',[-3, 3]); %   
 deformLim = struct('trans',[-20, 20], 'scale',[0.95, 1.05], 'stretch',100*[-1,1], 'shear',[-0.03, 0.03], 'shift',[-3.5, 3.5]);
 viewLims = struct('trans',[-Inf,Inf], 'scale',[-Inf,Inf], 'stretch',[-Inf,Inf], 'shear',[-Inf,Inf], 'shift',[-3, 3], 'velocity',[-3, 15], 'fluor',[-1, 3]); 
-GetRunNumber = @(x)(str2double(x(strfind(x, 'run')+3:end)));
+GetRunStartTime = @(x)(x(1)); GetRunNumber = @(x)(str2double(x(strfind(x, 'run')+3:end)));
 % Various useful subsets of the data to choose from
 xDone = find([dataTable{:,dataCol.done}] > 0);
 x2D = [10, 12, 15, 21, 22, 23, 27, 28, 33, 34, 35, 36, 39, 43]; %intersect(xDone, find( [dataTable{:,dataCol.volume}] == 0 ));
 x3D = [1, 3, 4, 5, 6, 8, 9, 11, 13, 14, 30, 31, 37, 38, 40, 41]; %intersect(xDone, find([dataTable{:,dataCol.volume}] == 1 ));
 xCSD = [5, 8, 9, 11, 13, 14, 28, 30, 31, 36, 37, 41]; %intersect(find(cellfun(@mean, cellfun(@ismissing, dataTable(:,dataCol.csd), 'uniformoutput',false) ) ~= 1), xDone )'
 xSham = [];
-x3Dcsd = [5, 9, 13, 30, 37, 41]; % intersect( x3D, xCSD ); only include experiments where CSD wave was well-registered
+x3Dcsd = [5, 8, 9, 13, 14, 30, 37, 41]; %[5, 9, 13, 30, 37, 41]; % intersect( x3D, xCSD ); only include experiments where CSD wave was well-registered
 x2Dcsd = intersect( x2D, xCSD );  
 %xBase = setdiff(xDone, xCSD);
 xPNS = 45:54;
@@ -39,8 +40,9 @@ xSlope = [5,9,30,31,37,41,28];
 xSuper = [37, 41, 31];
 xNGC = [62:65];
 xCtrl = [66, 87, 91, 97, 98, 99]; % 80,   89,
+xPrePost = [5, 8, 9, 11, 14, 16, 28, 31, 36, 41]; % [5,8,11,14,28,31,37,41]; %[5,8,9,13,28,30,31,36,37,41]; % good pre/post CSD data   30, 37
 % Choose which subset to  use
-xPresent = xCSD; %31; % 5; %x3D; % % x2D; 30; % %xCtrl; %x3Dcsd; %;5; %xCtrl; %x3Dcsd; %[x2D, xCtrl]; % xCtrl; %97; % x3D; %xCtrl; % 
+xPresent = xPrePost; % 16; % 31; %x2D; %xCSD; % [8,11,14]; % [5,8,9,11]; %31; % 5; %x3D; % % x2D; 30; % %xCtrl; %x3Dcsd; %;5; %xCtrl; %x3Dcsd; %[x2D, xCtrl]; % xCtrl; %97; % x3D; %xCtrl; % 
 Npresent = numel(xPresent);
 overwriteROI = false;
 for x = xPresent
@@ -87,45 +89,24 @@ for x = xPresent
     if any(cellfun(@isempty, {loco{x}.stateDown})) %isempty(loco{x}.stateDown)
         loco{x} = GetLocoState(expt{x}, loco{x}, 'dir',strcat(dataDir, expt{x}.mouse,'\'), 'name',expt{x}.mouse, 'var','velocity', 'show',false); %
     end
-    
-    % Segment movies
-    %{
-    zProj = 1;    
-    %badMat = false( expt{x}.Nscan, expt{x}.Nplane ); badMat(badInd) = true;  % size(deformCat{x}.scaleAP)
-    censScans = []; % 1:30; %  find(any(badMat(:,zProj), 2))';
-    segEdges = [80,80,40,40];
-    SegmentCat3D(catInfo{x}, 'chan','green', 'zProj',zProj, 'censScans',censScans, 'chunkSize',30, 'overwrite',false, 'minFoot',50, 'edges',segEdges); % 'edges', segParams{x}.edges,  affParams(x).edges , 'censScans',segParams{x}.censScans segParams{x}.zProj
-    %}
     segParams{x} = GetSegParams( catInfo{x} );
 
     % Load or generate and save mean and max projections
     maxProjPath = [expt{x}.dir, expt{x}.name, '_maxProj.tif']; %[expt{x}.dir, expt{x}.name, '_affineProj.tif'];
     meanProjPath = [expt{x}.dir, expt{x}.name, '_meanProj.tif'];
-    if ~exist(maxProjPath, 'file')
-        [~,zprojPath] = FileFinder(expt{x}.dir, 'contains','zproj', 'type','tif'); zprojPath = zprojPath{1};
-        %zprojPath = sprintf('%s%s_zproj.tif',expt{x}.dir, expt{x}.name ); %double(pipe.io.read_tiff(zprojPath));
-        fprintf('\n%s does not exist! Loading %s', maxProjPath, zprojPath); % expt{x}.sbx
-        zprojMovie = imread_big(zprojPath); %readSBX(expt{x}.sbx, catInfo{x}, 100, expt{x}.scanLims(expt{x}.preRuns(end)+1)-100 );
-        expt{x}.maxProj = max(zprojMovie, [] , 3);
-        saveastiff(expt{x}.maxProj, maxProjPath);
-        expt{x}.meanProj = mean(zprojMovie, 3);
-        saveastiff(uint16(expt{x}.meanProj), meanProjPath);
-        clearvars zprojMovie;
-    else
+    if exist(maxProjPath, 'file')
         expt{x}.maxProj = loadtiff( maxProjPath );
         expt{x}.meanProj = loadtiff( meanProjPath );
     end
 
     % Load ROI
-    % {
     try
         ROI{x} = MakeROI3D(expt{x}, 'overwrite',overwriteROI, 'corrPrct',90, 'minFoot',50);  % , 'corrPrct',90, [ROI{x}, preROI{x}] overwriteROI
-        ROI{x} = rmfield(ROI{x}, 'correlation'); % correlation field is memory-intensive and not useful
         expt{x}.Nroi = numel(ROI{x}); % Nauto(x)
     catch
         expt{x}.Nroi = 0;
     end
-    %}
+
     %{
     try
         [ROI{x}, ~ ] = LoadManualROI(expt{x}, [3,3,1], [8,8,1; 21,21,2], segParams{x}.zProj ); %^LoadManualROI( expt{x}, 3 );
@@ -135,44 +116,44 @@ for x = xPresent
     end
     expt{x}.Nroi = numel(ROI{x});
     %}
-   
     % Get fluor signals from ROIs
     if expt{x}.Nroi > 0
-        % Visualize ROIs in FOV
-        %[expt{x}.roiProj, ~, expt{x}.roiLabel] = VisualizeSegmentation(expt{x}, ROI{x}, 'overwrite',overwriteROI);   %  
-        %ROI{x} = WriteROIproj(expt{x}, catInfo{x}, ROI{x}, 'edges',segParams{x}.edges, 'overwrite',overwriteROI); % ROI = , 'rSet',32  overwriteROI
-        
+        %ROI{x} = WriteROIproj(expt{x}, catInfo{x}, ROI{x}, 'edges',segParams{x}.edges, 'overwrite',overwriteROI); % ROI = , 'rSet',32  overwriteROI       
         % Get ROI-specific fluor and deformation signals
-        try
-            fluor{x} = LoadROIfluor(expt{x}, fluor{x}, loco{x});
-        catch
-            fluor{x} = GetROIfluor(expt{x}, catInfo{x}, ROI{x}, fluor{x}, deform{x}, loco{x}, 'window',find(Tscan{x}{1}<=32,1,'last'), 'lp',0, 'deconvolve',false, 'overwrite',overwriteROI); %  
-        end
-        
+        fluor{x} = LoadROIfluor(expt{x}, fluor{x}, loco{x});       
         %if expt{x}.Nplane > 1,  ROIdeform{x} = GetROIdeform(ROI{x}, deform{x}, defVars);  end
         for run = flip(1:expt{x}.Nruns)
             [fluorEvent{x}{run}, NfluorEvent{x}(run,:), fluorEventRate{x}(run,:), eventRaster{x}{run}] = ...
                 DetectEvents(Tscan{x}{run}, fluor{x}(run).z.ROI, fluor{x}(run).dFF.ROI, 'minMag',0.05, 'minDur',1, 'minZ',1, 'show',false); % expt{x}, 
-            %[~, ~, loco{x}(run)] = PeriLoco3D(expt{x}, Tscan{x}{run}, loco{x}(run), deform{x}(run), fluor{x}(run).F.ROI, defVars, 'base',20, 'run',2, 'iso',[0,0]); % 'Nshuff',1000 periParam(x) periBout{x}(run)
+        end
+        expt{x}.sbx.interp = strcat(expt{x}.dir, expt{x}.name, '.sbx_interp ');
+        if expt{x}.csd > 0
+            [csdBout{x}(expt{x}.csd), csdStat{x}] = PeriCSD(expt{x}, Tscan{x}{expt{x}.csd}, loco{x}(expt{x}.csd), deform{x}(expt{x}.csd), fluor{x}(expt{x}.csd), defVars, 'show',false, 'overwrite',false); % , csdParam(x)
+            % Which runs are associated with the pre-, acute or post-CSD phases?
+            TrunStart = cellfun(GetRunStartTime, Tscan{x});
+            TrunCSDmin = (TrunStart - csdBout{x}(expt{x}.csd).Tstart)/60; % minutes, relative to CSD onset
+            expt{x}.preRuns = find(TrunCSDmin < -5);
+            expt{x}.acuteRuns = find(TrunCSDmin >= -5 & TrunCSDmin < 20);
+            expt{x}.postRuns = find(TrunCSDmin >= 20);
         end
         
-        if expt{x}.csd > 0
-            [csdBout{x}(expt{x}.csd), csdStat{x}, csdParam(x)] = PeriCSD(expt{x}, Tscan{x}{expt{x}.csd}, loco{x}(expt{x}.csd), deform{x}(expt{x}.csd), fluor{x}(expt{x}.csd), defVars, 'show',false, 'overwrite',false);
-        end
-        %[stillEpoch{x}, stillSumm{x}] = GetStillEpochs(expt{x}, Tscan{x}, loco{x}, fluor{x}, deform{x}, csdBout{x}); % find long periods of stillness between locomotive bouts
-
-        % Merge ROIs into putative axons and get axonal signals
-        %[axon{x}, expt{x}, stillCosSim{x}, stillCorr{x}] = MergeROI3D(expt{x}, Tscan{x}, loco{x}, ROI{x}, fluor{x}, SAFE{x}, 'method','cluster', 'mergeThresh',1.5, 'show',false);  
-        %fluor{x} = GetAxonFluor(expt{x}, catInfo{x}, axon{x}, fluor{x}, deform{x}, 'window',find(Tscan{x}{1}<=32,1,'last'), 'overwrite',false); 
-        %fluor{x} = GetAxonFluor(expt{x}, catInfo{x}, fiber{x}, fluor{x}, deform{x}, 'window',find(Tscan{x}{1}<=32,1,'last'), 'overwrite',true); 
-        %ROI{x} = WriteROIproj(expt{x}, catInfo{x}, ROI{x}, axon{x}, 'edges',segParam(x).edges, 'overwrite',false);
-        %WriteROIproj(expt{x}, catInfo{x}, ROI{x}, fiber{x}, 'edges',segParams{x}.edges, 'overwrite',false);
     else
         fprintf('\n%s: No ROI found!', expt{x}.name)
     end
     %}
+    %}
 end
 % May need to run BoutResponse, SpontVsLocoEvent, FiberAnalyis, CSDspread
+
+%%
+for x = xPresent
+     TrunStart = cellfun(GetRunStartTime, Tscan{x});
+            TrunCSDmin = (TrunStart - csdBout{x}(expt{x}.csd).Tstart)/60; % minutes, relative to CSD onset
+         
+    expt{x}.preRuns = find(TrunCSDmin < -5);
+    expt{x}.acuteRuns = [];%find(TrunCSDmin >= -5 & TrunCSDmin < 30);
+    expt{x}.postRuns = expt{x}.csd:expt{x}.Nruns; find(TrunCSDmin >= 0);
+end
 
 %% Save locomotion data to avoid needing to recalculate HMMs 
 for x = xPresent
@@ -185,7 +166,10 @@ for x = xPresent
 end
 
 
-
+for x = xPresent
+      GetDeformCat3D( catInfo{x}, deformLim, 'show',true, 'overwrite',false, 'window',find(Tscan{x}{1}<=32,1,'last') ); 
+      pause
+end
 
 
 
